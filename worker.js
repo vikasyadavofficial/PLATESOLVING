@@ -49,7 +49,7 @@ export default {
         const session = await login(env);
         const fd = new FormData();
         fd.append("request-json", JSON.stringify({
-          session, publicly_visible: "n", allow_modifications: "n", allow_commercial_use: "n",
+          session, publicly_visible: "y", allow_modifications: "n", allow_commercial_use: "n",
         }));
         fd.append("file", file, "upload");
         const up = await (await fetch(`${NOVA}/api/upload`, { method: "POST", body: fd })).json();
@@ -80,11 +80,15 @@ export default {
       // GET /image/:jobId  ->  annotated image bytes (lets the browser save it)
       m = url.pathname.match(/^\/image\/(\d+)$/);
       if (req.method === "GET" && m) {
-        const r = await fetch(`${NOVA}/annotated_full/${m[1]}`);
-        if (!r.ok) return json({ error: "Annotated image is not available." }, 502, cors);
+        const session = await login(env);
+        const r = await fetch(`${NOVA}/annotated_full/${m[1]}`, {
+          headers: { Cookie: `sessionid=${session}; session=${session}` },
+        });
+        const ct = r.headers.get("Content-Type") || "";
+        if (!r.ok || !ct.startsWith("image/")) return json({ error: "Annotated image is not available." }, 502, cors);
         return new Response(r.body, {
           status: 200,
-          headers: { "Content-Type": r.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "private, max-age=600", ...cors },
+          headers: { "Content-Type": ct, "Cache-Control": "private, max-age=600", ...cors },
         });
       }
 
