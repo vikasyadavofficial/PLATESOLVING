@@ -216,10 +216,13 @@ async function loadImage(jobId) {
   try {
     const r = await fetch(API + "/image/" + encodeURIComponent(jobId));
     const b = await r.blob();
-    if (!r.ok || !b.type.startsWith("image/")) throw 0;
+    if (!r.ok || !b.type.startsWith("image/")) {
+      let why = ""; try { why = JSON.parse(await b.text()).error || ""; } catch {}
+      throw new Error(why);
+    }
     if (last && last.jobId === jobId) last.blob = b;
     img.src = URL.createObjectURL(b); s.textContent = "";
-  } catch { s.textContent = "The annotated image could not be loaded."; }
+  } catch (e) { s.textContent = "The annotated image could not be loaded. " + (e && e.message ? e.message : ""); }
 }
 $("dlImg").addEventListener("click", () => {
   if (!last || !last.blob) return ($("dlStatus").textContent = "The annotated image is not available to download.");
