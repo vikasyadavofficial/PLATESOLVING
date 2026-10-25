@@ -66,6 +66,7 @@ input[type=file]{position:absolute;opacity:0;pointer-events:none}
 .btn{display:inline-flex;border:0;border-radius:999px;background:var(--pri);color:var(--prifg);padding:1rem 3rem;font:inherit;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .2s,box-shadow .2s,opacity .2s}
 .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.22)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
+a.btn{text-decoration:none;align-items:center}
 #status{font-size:.95rem;color:var(--muted)}#status.err{color:var(--bad);font-weight:600}
 .bar{height:3px;background:var(--border);border-radius:3px;margin-top:1.25rem;overflow:hidden;display:none}
 .bar i{display:block;height:100%;width:35%;background:var(--pri);animation:slide 1.4s ease-in-out infinite}
@@ -124,12 +125,8 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
       <div><dt>Parity</dt><dd id="parity"></dd></div>
     </dl>
     <ul class="chips" id="objects" aria-label="Objects in field"></ul>
-    <figure>
-      <img id="annotated" alt="Your image annotated with the catalogued objects it contains">
-      <figcaption>Annotated by Astrometry.net · <a id="jobLink" target="_blank" rel="noopener noreferrer">open on Astrometry.net</a></figcaption>
-    </figure>
     <div class="row">
-      <button class="btn" id="dlImg" type="button">Download image</button>
+      <a class="btn" id="openImg" target="_blank" rel="noopener noreferrer">Open image</a>
       <button class="btn" id="dlTxt" type="button">Download results</button>
       <span id="dlStatus" class="muted" role="status"></span>
     </div>
@@ -210,24 +207,6 @@ function save(blob, name) {
   a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 2000);
 }
-async function loadImage(jobId) {
-  const s = $("dlStatus"), img = $("annotated");
-  img.removeAttribute("src"); s.textContent = "Loading annotated image…";
-  try {
-    const r = await fetch(API + "/image/" + encodeURIComponent(jobId));
-    const b = await r.blob();
-    if (!r.ok || !b.type.startsWith("image/")) {
-      let why = ""; try { why = JSON.parse(await b.text()).error || ""; } catch {}
-      throw new Error(why);
-    }
-    if (last && last.jobId === jobId) last.blob = b;
-    img.src = URL.createObjectURL(b); s.textContent = "";
-  } catch (e) { s.textContent = "The annotated image could not be loaded. " + (e && e.message ? e.message : ""); }
-}
-$("dlImg").addEventListener("click", () => {
-  if (!last || !last.blob) return ($("dlStatus").textContent = "The annotated image is not available to download.");
-  save(last.blob, "plate-solved-" + last.jobId + (last.blob.type.includes("png") ? ".png" : ".jpg"));
-});
 $("dlTxt").addEventListener("click", () => {
   if (!last) return;
   const c = last.calibration, t = [
@@ -252,8 +231,7 @@ function show({ calibration: c, objects, jobId }) {
   stat("parity", c.parity === 0 ? "Normal" : "Flipped");
   const ul = $("objects"); ul.replaceChildren();
   objects.slice(0, 40).forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
-  $("jobLink").href = `${NOVA}/annotated_display/${encodeURIComponent(jobId)}`;
-  loadImage(jobId);
+  $("openImg").href = `${NOVA}/annotated_display/${encodeURIComponent(jobId)}`;
   $("result").style.display = "block";
   $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
 }
