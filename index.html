@@ -4,7 +4,7 @@
 <title>Plate Solver · Indian Society For Scientific Consciousness</title>
 <meta name="description" content="Upload a night-sky photo and find out exactly where it points. A free tool from the Indian Society For Scientific Consciousness.">
 <!-- Replace YOUR-WORKER with your Cloudflare Worker subdomain in BOTH places below -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data: https://nova.astrometry.net; connect-src https://isscplatesolver.vikasyadav-official9680.workers.dev/; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data: https://nova.astrometry.net; connect-src https://isscplatesolver.vikasyadav-official9680.workers.dev; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#d9d9d9">
 <link rel="icon" type="image/png" href="favicon.png">
@@ -90,8 +90,8 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
 </style></head>
 <body>
 <header><div class="wrap">
-  <a class="brand" href="https://isscplatesolver.vikasyadav-official9680.workers.dev/"><img src="logo.jpg" alt="ISSC emblem" width="40" height="40"><span>Indian Society For Scientific Consciousness</span></a>
-  <nav aria-label="Main"><a href="https://isscplatesolver.vikasyadav-official9680.workers.dev/">Main site</a><a href="./" aria-current="page">Plate Solver</a></nav>
+  <a class="brand" href="https://vikasyadavofficial.github.io/ISSC/"><img src="logo.jpg" alt="ISSC emblem" width="40" height="40"><span>Indian Society For Scientific Consciousness</span></a>
+  <nav aria-label="Main"><a href="https://vikasyadavofficial.github.io/ISSC/">Main site</a><a href="./" aria-current="page">Plate Solver</a></nav>
 </div></header>
 
 <main>
@@ -126,7 +126,7 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
     <ul class="chips" id="objects" aria-label="Objects in field"></ul>
     <figure>
       <img id="annotated" alt="Your image annotated with the catalogued objects it contains">
-      <figcaption>Annotated by Astrometry.net · <a id="jobLink" target="_blank" rel="noopener noreferrer">open full result</a></figcaption>
+      <figcaption>Annotated by Astrometry.net</figcaption>
     </figure>
     <div class="row">
       <button class="btn" id="dlImg" type="button">Download image</button>
@@ -210,16 +210,20 @@ function save(blob, name) {
   a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 2000);
 }
-$("dlImg").addEventListener("click", async () => {
-  if (!last) return;
-  const s = $("dlStatus"); s.textContent = "Preparing image…";
+async function loadImage(jobId) {
+  const s = $("dlStatus"), img = $("annotated");
+  img.removeAttribute("src"); s.textContent = "Loading annotated image…";
   try {
-    const r = await fetch(API + "/image/" + encodeURIComponent(last.jobId));
-    if (!r.ok) throw 0;
+    const r = await fetch(API + "/image/" + encodeURIComponent(jobId));
     const b = await r.blob();
-    save(b, "plate-solved-" + last.jobId + (b.type.includes("png") ? ".png" : ".jpg"));
-    s.textContent = "";
-  } catch { s.textContent = "Could not download the image. Try again."; }
+    if (!r.ok || !b.type.startsWith("image/")) throw 0;
+    if (last && last.jobId === jobId) last.blob = b;
+    img.src = URL.createObjectURL(b); s.textContent = "";
+  } catch { s.textContent = "The annotated image could not be loaded."; }
+}
+$("dlImg").addEventListener("click", () => {
+  if (!last || !last.blob) return ($("dlStatus").textContent = "The annotated image is not available to download.");
+  save(last.blob, "plate-solved-" + last.jobId + (last.blob.type.includes("png") ? ".png" : ".jpg"));
 });
 $("dlTxt").addEventListener("click", () => {
   if (!last) return;
@@ -245,8 +249,7 @@ function show({ calibration: c, objects, jobId }) {
   stat("parity", c.parity === 0 ? "Normal" : "Flipped");
   const ul = $("objects"); ul.replaceChildren();
   objects.slice(0, 40).forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
-  $("annotated").src = `${NOVA}/annotated_full/${encodeURIComponent(jobId)}`;
-  $("jobLink").href = `${NOVA}/annotated_full/${encodeURIComponent(jobId)}`;
+  loadImage(jobId);
   $("result").style.display = "block";
   $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
 }
