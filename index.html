@@ -126,7 +126,7 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
     <ul class="chips" id="objects" aria-label="Objects in field"></ul>
     <figure>
       <img id="annotated" alt="Your image annotated with the catalogued objects it contains">
-      <figcaption>Annotated by Astrometry.net</figcaption>
+      <figcaption>Annotated by Astrometry.net · <a id="jobLink" target="_blank" rel="noopener noreferrer">open on Astrometry.net</a></figcaption>
     </figure>
     <div class="row">
       <button class="btn" id="dlImg" type="button">Download image</button>
@@ -252,6 +252,7 @@ function show({ calibration: c, objects, jobId }) {
   stat("parity", c.parity === 0 ? "Normal" : "Flipped");
   const ul = $("objects"); ul.replaceChildren();
   objects.slice(0, 40).forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+  $("jobLink").href = `${NOVA}/annotated_display/${encodeURIComponent(jobId)}`;
   loadImage(jobId);
   $("result").style.display = "block";
   $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
