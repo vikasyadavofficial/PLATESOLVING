@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plate Solver · Indian Society For Scientific Consciousness</title>
+<meta name="description" content="Upload a night-sky photo and find out exactly where it points. A free tool from the Indian Society For Scientific Consciousness.">
+<!-- Replace YOUR-WORKER with your Cloudflare Worker subdomain in BOTH places below -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data: https://nova.astrometry.net; connect-src https://isscplatesolver.vikasyadav-official9680.workers.dev/; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#d9d9d9">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;1,600&display=swap">
+<style>
+/* Theme tokens copied from the main ISSC website */
+:root{--bg:#d9d9d9;--fg:#1a1a1a;--card:#e6e6e6;--pop:#ececec;--pri:#171717;--prifg:#f4f4f4;--muted:#555;--border:#b3b3b3;--input:#a3a3a3;--ring:#4d4d4d;--bad:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161616;--fg:#e8e8e8;--card:#222;--pop:#2a2a2a;--pri:#ededed;--prifg:#161616;--muted:#a0a0a0;--border:#3d3d3d;--input:#555;--ring:#aaa;--bad:#ff8a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161616;--fg:#e8e8e8;--card:#222;--pop:#2a2a2a;--pri:#ededed;--prifg:#161616;--muted:#a0a0a0;--border:#3d3d3d;--input:#555;--ring:#aaa;--bad:#ff8a80;color-scheme:dark}
+*{box-sizing:border-box;border-color:var(--border)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Nunito,system-ui,sans-serif;line-height:1.5}
+h1,h2,h3{font-family:Manrope,system-ui,sans-serif;margin:0}
+a{color:inherit}img{max-width:100%;display:block}
+.wrap{max-width:80rem;margin:0 auto;padding:0 1.5rem}
+@media(min-width:768px){.wrap{padding:0 3rem}}
+::selection{background:var(--pri);color:var(--prifg)}
+a:focus-visible,button:focus-visible,label:focus-visible{outline:2px solid var(--ring);outline-offset:3px;border-radius:4px}
+
+/* header + footer, same as main site */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+header .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding-top:1rem;padding-bottom:1rem}
+.brand{display:flex;align-items:center;gap:.75rem;font-family:Manrope,sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;text-decoration:none;line-height:1.15}
+.brand img{width:2.5rem;height:2.5rem;border-radius:50%;border:1px solid var(--border)}
+@media(min-width:768px){.brand{font-size:1.25rem}}
+nav{display:flex;gap:1.25rem;font-size:.9rem}
+nav a{position:relative;padding:.25rem 0;text-decoration:none}
+nav a::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1.5px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
+nav a:hover::after,nav a[aria-current=page]::after{transform:scaleX(1)}
+footer{margin-top:6rem;border-top:1px solid var(--border);background:color-mix(in srgb,var(--card) 60%,transparent)}
+footer .wrap{display:flex;flex-direction:column;gap:.5rem;padding-top:2.5rem;padding-bottom:2.5rem}
+@media(min-width:768px){footer .wrap{flex-direction:row;justify-content:space-between}}
+footer .fb{font-family:Manrope,sans-serif;font-size:1.1rem}
+footer a{font-size:.9rem;color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg);text-decoration:underline}
+.toggle{position:fixed;right:1rem;bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:5;border:1px solid var(--border);background:var(--card);color:var(--fg);border-radius:999px;padding:.5rem .9rem;font:inherit;font-size:.8rem;cursor:pointer}
+
+/* hero */
+.hero{padding-top:4rem;padding-bottom:2rem;display:grid;gap:2.5rem;align-items:center}
+@media(min-width:768px){.hero{grid-template-columns:1.4fr 1fr}}
+.h-xl{font-size:clamp(2.6rem,7vw,4.5rem);font-weight:700;font-style:italic;line-height:1.02;letter-spacing:-.025em}
+.muted{color:var(--muted)}
+.hero p{max-width:34rem;margin:1.25rem 0 0;font-size:1.05rem}
+.emblem{width:min(15rem,60vw);margin:0 auto;border-radius:50%;border:1px solid var(--border);box-shadow:0 18px 50px rgba(0,0,0,.28)}
+
+/* upload */
+.tool{padding-bottom:2rem}
+#drop{position:relative;display:grid;place-items:center;text-align:center;min-height:19rem;padding:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;overflow:hidden;transition:border-color .2s,box-shadow .3s}
+#drop::before,#drop::after{content:"";position:absolute;background:var(--border);opacity:.7}
+#drop::before{left:50%;top:0;bottom:0;width:1px}#drop::after{top:50%;left:0;right:0;height:1px}
+#drop:hover,#drop.over{border-color:var(--ring);box-shadow:0 14px 30px rgba(0,0,0,.18)}
+#drop .inner{position:relative;z-index:1;background:var(--pop);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.75rem;max-width:min(26rem,100%);word-break:break-word}
+#drop strong{display:block;font-family:Manrope,sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:.25rem}
+#drop span{font-size:.9rem;color:var(--muted)}
+#preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.3;display:none}
+input[type=file]{position:absolute;opacity:0;pointer-events:none}
+.row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem}
+.btn{display:inline-flex;border:0;border-radius:999px;background:var(--pri);color:var(--prifg);padding:1rem 3rem;font:inherit;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .2s,box-shadow .2s,opacity .2s}
+.btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.22)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+#status{font-size:.95rem;color:var(--muted)}#status.err{color:var(--bad);font-weight:600}
+.bar{height:3px;background:var(--border);border-radius:3px;margin-top:1.25rem;overflow:hidden;display:none}
+.bar i{display:block;height:100%;width:35%;background:var(--pri);animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+
+/* results: same stat style as main site */
+#result{display:none;padding-top:3rem}
+#result h2{font-size:clamp(1.9rem,4vw,2.5rem);font-weight:600;letter-spacing:-.02em;margin-bottom:2rem}
+.stats{display:grid;gap:2rem 3rem}
+@media(min-width:640px){.stats{grid-template-columns:1fr 1fr}}
+@media(min-width:960px){.stats{grid-template-columns:repeat(3,1fr)}}
+.stats>div{border-top:2px solid var(--fg);padding-top:1rem}
+.stats dt{font-size:.9rem;color:var(--muted);margin:0}
+.stats dd{margin:.25rem 0 0;font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.stats dd small{display:block;font:600 .85rem Nunito,sans-serif;color:var(--muted);margin-top:.15rem}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:2.5rem 0 2rem;padding:0}
+.chips li{list-style:none;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:.25rem 1rem;font-size:.85rem;font-weight:600}
+figure{margin:0}
+figure img{width:100%;height:auto;border-radius:10px;border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.2);background:var(--card)}
+figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{text-underline-offset:3px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.bar i{width:100%}}
+</style></head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="https://isscplatesolver.vikasyadav-official9680.workers.dev/"><img src="logo.jpg" alt="ISSC emblem" width="40" height="40"><span>Indian Society For Scientific Consciousness</span></a>
+  <nav aria-label="Main"><a href="https://isscplatesolver.vikasyadav-official9680.workers.dev/">Main site</a><a href="./" aria-current="page">Plate Solver</a></nav>
+</div></header>
+
+<main>
+  <section class="wrap hero">
+    <div>
+      <h1 class="h-xl">Where is this photo pointing?</h1>
+      <p class="muted">Upload a picture of the night sky. Plate Solver matches its stars against a catalogue and returns the exact coordinates, scale and rotation, usually within a minute.</p>
+    </div>
+    <img class="emblem" src="logo.jpg" alt="ISSC emblem" width="240" height="240">
+  </section>
+
+  <section class="wrap tool">
+    <label id="drop" tabindex="0" for="file" aria-label="Choose or drop a sky image">
+      <img id="preview" alt="">
+      <div class="inner"><strong id="dropTitle">Drop an image here</strong><span id="dropHint">or click to browse. JPG, PNG, TIFF or WebP, up to 25 MB</span></div>
+    </label>
+    <input id="file" type="file" accept="image/jpeg,image/png,image/tiff,image/webp">
+    <div class="row"><button class="btn" id="go" disabled>Solve image</button><span id="status" role="status" aria-live="polite"></span></div>
+    <div class="bar" id="bar"><i></i></div>
+  </section>
+
+  <section class="wrap" id="result" aria-live="polite">
+    <h2>Solved</h2>
+    <dl class="stats">
+      <div><dt>Right ascension</dt><dd id="ra"></dd></div>
+      <div><dt>Declination</dt><dd id="dec"></dd></div>
+      <div><dt>Pixel scale</dt><dd id="scale"></dd></div>
+      <div><dt>Field radius</dt><dd id="radius"></dd></div>
+      <div><dt>Rotation</dt><dd id="orient"></dd></div>
+      <div><dt>Parity</dt><dd id="parity"></dd></div>
+    </dl>
+    <ul class="chips" id="objects" aria-label="Objects in field"></ul>
+    <figure>
+      <img id="annotated" alt="Your image annotated with the catalogued objects it contains">
+      <figcaption>Annotated by Astrometry.net · <a id="jobLink" target="_blank" rel="noopener noreferrer">open full result</a></figcaption>
+    </figure>
+    <div class="row">
+      <button class="btn" id="dlImg" type="button">Download image</button>
+      <button class="btn" id="dlTxt" type="button">Download results</button>
+      <span id="dlStatus" class="muted" role="status"></span>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span class="fb">Indian Society For Scientific Consciousness</span><a href="https://nova.astrometry.net" target="_blank" rel="noopener noreferrer">Solving powered by Astrometry.net · images stay private</a></div></footer>
+<button class="toggle" id="tg" aria-label="Toggle light or dark theme">◐ Theme</button>
+
+<script>
+"use strict";
+const API = "https://isscplatesolver.vikasyadav-official9680.workers.dev/";   // <- your Worker URL (no trailing slash)
+const NOVA = "https://nova.astrometry.net";
+const MAX = 25 * 1024 * 1024, OK = ["image/jpeg","image/png","image/tiff","image/webp"];
+const $ = id => document.getElementById(id);
+let file = null, busy = false;
+const setStatus = (t, err) => { $("status").textContent = t; $("status").className = err ? "err" : ""; };
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// theme toggle (same behaviour as main site)
+$("tg").onclick = () => { const r = document.documentElement, dk = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme:dark)").matches; r.dataset.theme = dk ? "light" : "dark"; };
+
+function pick(f) {
+  if (!f) return;
+  if (!OK.includes(f.type)) return setStatus("Use a JPG, PNG, TIFF or WebP image.", true);
+  if (f.size > MAX) return setStatus("That file is over 25 MB. Export a smaller copy.", true);
+  file = f; setStatus("");
+  $("dropTitle").textContent = f.name;
+  $("dropHint").textContent = (f.size / 1048576).toFixed(1) + " MB. Click to choose another";
+  if (f.type !== "image/tiff") { const p = $("preview"); if (p.src) URL.revokeObjectURL(p.src); p.src = URL.createObjectURL(f); p.style.display = "block"; }
+  $("go").disabled = false;
+}
+const drop = $("drop");
+$("file").addEventListener("change", e => pick(e.target.files[0]));
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => pick(e.dataTransfer.files[0]));
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+
+async function api(path, opts) {
+  const r = await fetch(API + path, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Something went wrong. Try again.");
+  return j;
+}
+
+$("go").addEventListener("click", async () => {
+  if (!file || busy) return;
+  busy = true; $("go").disabled = true; $("result").style.display = "none"; $("bar").style.display = "block";
+  try {
+    setStatus("Uploading…");
+    const fd = new FormData(); fd.append("file", file);
+    const { subid } = await api("/solve", { method: "POST", body: fd });
+    const started = Date.now(); let st;
+    while (true) {
+      if (Date.now() - started > 5 * 60 * 1000) throw new Error("Solving is taking too long. Try a smaller or clearer image.");
+      await wait(3000);
+      st = await api("/status/" + subid);
+      if (st.state === "success") break;
+      if (st.state === "failure") throw new Error("No match found. Try an image with more visible stars and no heavy trails.");
+      setStatus(st.state === "queued" ? "Waiting in the queue…" : "Matching stars…");
+    }
+    setStatus("Fetching results…");
+    show(await api("/result/" + st.jobId));
+    setStatus("");
+  } catch (e) { setStatus(e.message, true); }
+  finally { busy = false; $("go").disabled = false; $("bar").style.display = "none"; }
+});
+
+const pad = n => String(n).padStart(2, "0");
+function hms(deg) { const h = ((deg % 360) + 360) % 360 / 15, H = Math.floor(h), M = Math.floor((h - H) * 60); return `${pad(H)}h ${pad(M)}m ${((h - H) * 60 - M).toFixed(1).padStart(4, "0")}s`; }
+function dms(deg) { const s = deg < 0 ? "−" : "+", a = Math.abs(deg), D = Math.floor(a), M = Math.floor((a - D) * 60); return `${s}${pad(D)}° ${pad(M)}′ ${(((a - D) * 60 - M) * 60).toFixed(0).padStart(2, "0")}″`; }
+function stat(id, main, sub) { const el = $(id); el.textContent = main; if (sub) { const s = document.createElement("small"); s.textContent = sub; el.appendChild(s); } }
+
+let last = null;
+function save(blob, name) {
+  const u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 2000);
+}
+$("dlImg").addEventListener("click", async () => {
+  if (!last) return;
+  const s = $("dlStatus"); s.textContent = "Preparing image…";
+  try {
+    const r = await fetch(API + "/image/" + encodeURIComponent(last.jobId));
+    if (!r.ok) throw 0;
+    const b = await r.blob();
+    save(b, "plate-solved-" + last.jobId + (b.type.includes("png") ? ".png" : ".jpg"));
+    s.textContent = "";
+  } catch { s.textContent = "Could not download the image. Try again."; }
+});
+$("dlTxt").addEventListener("click", () => {
+  if (!last) return;
+  const c = last.calibration, t = [
+    "Plate Solver result · Indian Society For Scientific Consciousness", "",
+    "Right ascension: " + hms(c.ra) + " (" + c.ra.toFixed(4) + " deg)",
+    "Declination: " + dms(c.dec) + " (" + c.dec.toFixed(4) + " deg)",
+    "Pixel scale: " + c.pixscale.toFixed(2) + " arcsec/pixel",
+    "Field radius: " + c.radius.toFixed(2) + " deg",
+    "Rotation: " + c.orientation.toFixed(1) + " deg east of north",
+    "Parity: " + (c.parity === 0 ? "Normal" : "Flipped"), "",
+    "Objects in field: " + (last.objects.join(", ") || "none listed"), ""].join("\n");
+  save(new Blob([t], { type: "text/plain" }), "plate-solved-" + last.jobId + ".txt");
+});
+
+function show({ calibration: c, objects, jobId }) {
+  last = { calibration: c, objects, jobId }; $("dlStatus").textContent = "";
+  stat("ra", hms(c.ra), c.ra.toFixed(4) + "°");
+  stat("dec", dms(c.dec), c.dec.toFixed(4) + "°");
+  stat("scale", c.pixscale.toFixed(2) + " ″/px");
+  stat("radius", c.radius.toFixed(2) + "°", "about " + (c.radius * 2).toFixed(1) + "° across");
+  stat("orient", c.orientation.toFixed(1) + "°", "east of north");
+  stat("parity", c.parity === 0 ? "Normal" : "Flipped");
+  const ul = $("objects"); ul.replaceChildren();
+  objects.slice(0, 40).forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+  $("annotated").src = `${NOVA}/annotated_full/${encodeURIComponent(jobId)}`;
+  $("jobLink").href = `${NOVA}/annotated_full/${encodeURIComponent(jobId)}`;
+  $("result").style.display = "block";
+  $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+}
+</script>
+</body></html>
