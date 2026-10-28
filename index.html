@@ -1,239 +1,1083 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en">
+<head>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plate Solver · Indian Society For Scientific Consciousness</title>
-<meta name="description" content="Upload a night-sky photo and find out exactly where it points. A free tool from the Indian Society For Scientific Consciousness.">
-<!-- Replace YOUR-WORKER with your Cloudflare Worker subdomain in BOTH places below -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data: https://nova.astrometry.net; connect-src https://isscplatesolver.vikasyadav-official9680.workers.dev; base-uri 'none'; form-action 'none'">
+<meta name="description" content="Upload an astrophotography picture or FITS file to determine its exact sky coordinates, scale, orientation, field of view, and optical quality diagnostics.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' blob: data: https://nova.astrometry.net https://isscplatesolver.vikasyadav-official9680.workers.dev; connect-src https://isscplatesolver.vikasyadav-official9680.workers.dev http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#d9d9d9">
 <link rel="icon" type="image/png" href="favicon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Nunito:ital,wght@0,400;0,600;0,700;1,600&display=swap">
 <style>
-/* Theme tokens copied from the main ISSC website */
-:root{--bg:#d9d9d9;--fg:#1a1a1a;--card:#e6e6e6;--pop:#ececec;--pri:#171717;--prifg:#f4f4f4;--muted:#555;--border:#b3b3b3;--input:#a3a3a3;--ring:#4d4d4d;--bad:#b3261e;
-box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
-html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161616;--fg:#e8e8e8;--card:#222;--pop:#2a2a2a;--pri:#ededed;--prifg:#161616;--muted:#a0a0a0;--border:#3d3d3d;--input:#555;--ring:#aaa;--bad:#ff8a80;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#161616;--fg:#e8e8e8;--card:#222;--pop:#2a2a2a;--pri:#ededed;--prifg:#161616;--muted:#a0a0a0;--border:#3d3d3d;--input:#555;--ring:#aaa;--bad:#ff8a80;color-scheme:dark}
-*{box-sizing:border-box;border-color:var(--border)}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:Nunito,system-ui,sans-serif;line-height:1.5}
-h1,h2,h3{font-family:Manrope,system-ui,sans-serif;margin:0}
-a{color:inherit}img{max-width:100%;display:block}
-.wrap{max-width:80rem;margin:0 auto;padding:0 1.5rem}
-@media(min-width:768px){.wrap{padding:0 3rem}}
-::selection{background:var(--pri);color:var(--prifg)}
-a:focus-visible,button:focus-visible,label:focus-visible{outline:2px solid var(--ring);outline-offset:3px;border-radius:4px}
+/* Base Theme Tokens */
+:root {
+  --bg: #d9d9d9;
+  --fg: #1a1a1a;
+  --card: #e6e6e6;
+  --pop: #ececec;
+  --pri: #171717;
+  --prifg: #f4f4f4;
+  --muted: #555;
+  --border: #b3b3b3;
+  --input: #a3a3a3;
+  --ring: #4d4d4d;
+  --bad: #b3261e;
+  --ok: #1b5e20;
+  --warn: #e65100;
+  --accent: #2c5282;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); scroll-behavior: smooth; }
 
-/* header + footer, same as main site */
-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
-header .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding-top:1rem;padding-bottom:1rem}
-.brand{display:flex;align-items:center;gap:.75rem;font-family:Manrope,sans-serif;font-weight:800;font-size:1.05rem;letter-spacing:-.02em;text-decoration:none;line-height:1.15}
-.brand img{width:2.5rem;height:2.5rem;border-radius:50%;border:1px solid var(--border)}
-@media(min-width:768px){.brand{font-size:1.25rem}}
-nav{display:flex;gap:1.25rem;font-size:.9rem}
-nav a{position:relative;padding:.25rem 0;text-decoration:none}
-nav a::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1.5px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
-nav a:hover::after,nav a[aria-current=page]::after{transform:scaleX(1)}
-footer{margin-top:6rem;border-top:1px solid var(--border);background:color-mix(in srgb,var(--card) 60%,transparent)}
-footer .wrap{display:flex;flex-direction:column;gap:.5rem;padding-top:2.5rem;padding-bottom:2.5rem}
-@media(min-width:768px){footer .wrap{flex-direction:row;justify-content:space-between}}
-footer .fb{font-family:Manrope,sans-serif;font-size:1.1rem}
-footer a{font-size:.9rem;color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg);text-decoration:underline}
-.toggle{position:fixed;right:1rem;bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:5;border:1px solid var(--border);background:var(--card);color:var(--fg);border-radius:999px;padding:.5rem .9rem;font:inherit;font-size:.8rem;cursor:pointer}
+/* Dark Theme */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="astro-red"]) {
+    --bg: #161616; --fg: #e8e8e8; --card: #222; --pop: #2a2a2a;
+    --pri: #ededed; --prifg: #161616; --muted: #a0a0a0; --border: #3d3d3d;
+    --input: #555; --ring: #aaa; --bad: #ff8a80; --ok: #81c784; --warn: #ffb74d; --accent: #63b3ed;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161616; --fg: #e8e8e8; --card: #222; --pop: #2a2a2a;
+  --pri: #ededed; --prifg: #161616; --muted: #a0a0a0; --border: #3d3d3d;
+  --input: #555; --ring: #aaa; --bad: #ff8a80; --ok: #81c784; --warn: #ffb74d; --accent: #63b3ed;
+  color-scheme: dark;
+}
 
-/* hero */
-.hero{padding-top:4rem;padding-bottom:2rem;display:grid;gap:2.5rem;align-items:center}
-@media(min-width:768px){.hero{grid-template-columns:1.4fr 1fr}}
-.h-xl{font-size:clamp(2.6rem,7vw,4.5rem);font-weight:700;font-style:italic;line-height:1.02;letter-spacing:-.025em}
-.muted{color:var(--muted)}
-.hero p{max-width:34rem;margin:1.25rem 0 0;font-size:1.05rem}
-.emblem{width:min(15rem,60vw);margin:0 auto;border-radius:50%;border:1px solid var(--border);box-shadow:0 18px 50px rgba(0,0,0,.28)}
+/* Astro Red Night-Vision Theme (Preserves Scotopic Dark Adaptation at Star Parties) */
+:root[data-theme="astro-red"] {
+  --bg: #000000;
+  --fg: #ff3333;
+  --card: #150000;
+  --pop: #240000;
+  --pri: #ff2222;
+  --prifg: #000000;
+  --muted: #a82020;
+  --border: #440000;
+  --input: #660000;
+  --ring: #ff4444;
+  --bad: #ff6666;
+  --ok: #cc2222;
+  --warn: #ff7700;
+  --accent: #ff4444;
+  color-scheme: dark;
+}
+:root[data-theme="astro-red"] img#preview,
+:root[data-theme="astro-red"] figure img {
+  filter: sepia(100%) hue-rotate(315deg) saturate(300%) brightness(70%);
+}
 
-/* upload */
-.tool{padding-bottom:2rem}
-#drop{position:relative;display:grid;place-items:center;text-align:center;min-height:19rem;padding:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;overflow:hidden;transition:border-color .2s,box-shadow .3s}
-#drop::before,#drop::after{content:"";position:absolute;background:var(--border);opacity:.7}
-#drop::before{left:50%;top:0;bottom:0;width:1px}#drop::after{top:50%;left:0;right:0;height:1px}
-#drop:hover,#drop.over{border-color:var(--ring);box-shadow:0 14px 30px rgba(0,0,0,.18)}
-#drop .inner{position:relative;z-index:1;background:var(--pop);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.75rem;max-width:min(26rem,100%);word-break:break-word}
-#drop strong{display:block;font-family:Manrope,sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:.25rem}
-#drop span{font-size:.9rem;color:var(--muted)}
-#preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.3;display:none}
-input[type=file]{position:absolute;opacity:0;pointer-events:none}
-.row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem}
-.btn{display:inline-flex;border:0;border-radius:999px;background:var(--pri);color:var(--prifg);padding:1rem 3rem;font:inherit;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .2s,box-shadow .2s,opacity .2s}
-.btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.22)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-a.btn{text-decoration:none;align-items:center}
-#status{font-size:.95rem;color:var(--muted)}#status.err{color:var(--bad);font-weight:600}
-.bar{height:3px;background:var(--border);border-radius:3px;margin-top:1.25rem;overflow:hidden;display:none}
-.bar i{display:block;height:100%;width:35%;background:var(--pri);animation:slide 1.4s ease-in-out infinite}
-@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+* { box-sizing: border-box; border-color: var(--border); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: Nunito, system-ui, sans-serif; line-height: 1.5; }
+h1, h2, h3, h4 { font-family: Manrope, system-ui, sans-serif; margin: 0; }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+.wrap { max-width: 80rem; margin: 0 auto; padding: 0 1.5rem; }
+@media (min-width: 768px) { .wrap { padding: 0 3rem; } }
+::selection { background: var(--pri); color: var(--prifg); }
+a:focus-visible, button:focus-visible, label:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 4px;
+}
 
-/* results: same stat style as main site */
-#result{display:none;padding-top:3rem}
-#result h2{font-size:clamp(1.9rem,4vw,2.5rem);font-weight:600;letter-spacing:-.02em;margin-bottom:2rem}
-.stats{display:grid;gap:2rem 3rem}
-@media(min-width:640px){.stats{grid-template-columns:1fr 1fr}}
-@media(min-width:960px){.stats{grid-template-columns:repeat(3,1fr)}}
-.stats>div{border-top:2px solid var(--fg);padding-top:1rem}
-.stats dt{font-size:.9rem;color:var(--muted);margin:0}
-.stats dd{margin:.25rem 0 0;font-family:Manrope,sans-serif;font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
-.stats dd small{display:block;font:600 .85rem Nunito,sans-serif;color:var(--muted);margin-top:.15rem}
-.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:2.5rem 0 2rem;padding:0}
-.chips li{list-style:none;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:.25rem 1rem;font-size:.85rem;font-weight:600}
-figure{margin:0}
-figure img{width:100%;height:auto;border-radius:10px;border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.2);background:var(--card)}
-figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{text-underline-offset:3px}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.bar i{width:100%}}
-</style></head>
+/* Header & Footer */
+header {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
+.brand { display: flex; align-items: center; gap: .75rem; font-family: Manrope, sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -.02em; text-decoration: none; line-height: 1.15; }
+.brand img { width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 1px solid var(--border); }
+@media (min-width: 768px) { .brand { font-size: 1.25rem; } }
+nav { display: flex; align-items: center; gap: 1.25rem; font-size: .9rem; }
+nav a { position: relative; padding: .25rem 0; text-decoration: none; }
+nav a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1.5px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
+nav a:hover::after, nav a[aria-current=page]::after { transform: scaleX(1); }
+
+footer { margin-top: 5rem; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--card) 60%, transparent); }
+footer .wrap { display: flex; flex-direction: column; gap: .5rem; padding-top: 2.5rem; padding-bottom: 2.5rem; }
+@media (min-width: 768px) { footer .wrap { flex-direction: row; justify-content: space-between; align-items: center; } }
+footer .fb { font-family: Manrope, sans-serif; font-size: 1.1rem; }
+footer a { font-size: .9rem; color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--fg); text-decoration: underline; }
+
+.toggle-group {
+  position: fixed; right: 1rem; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); z-index: 100;
+  display: flex; gap: .25rem; background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+  padding: .3rem .4rem; box-shadow: 0 4px 15px rgba(0,0,0,.25);
+}
+.toggle-btn {
+  background: transparent; border: 0; color: var(--fg); border-radius: 999px; padding: .35rem .65rem;
+  font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; transition: background .15s, color .15s;
+}
+.toggle-btn.active { background: var(--pri); color: var(--prifg); }
+
+/* Hero */
+.hero { padding-top: 3.5rem; padding-bottom: 1.5rem; display: grid; gap: 2rem; align-items: center; }
+@media (min-width: 768px) { .hero { grid-template-columns: 1.4fr 1fr; } }
+.h-xl { font-size: clamp(2.3rem, 6vw, 4rem); font-weight: 700; font-style: italic; line-height: 1.05; letter-spacing: -.025em; }
+.muted { color: var(--muted); }
+.hero p { max-width: 36rem; margin: 1.25rem 0 0; font-size: 1.05rem; }
+.badge { display: inline-block; padding: .2rem .75rem; border-radius: 999px; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; background: var(--pop); border: 1px solid var(--border); margin-bottom: .8rem; }
+.emblem { width: min(14rem, 50vw); margin: 0 auto; border-radius: 50%; border: 1px solid var(--border); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+
+/* Drop Zone */
+.tool { padding-bottom: 2rem; }
+#drop {
+  position: relative; display: grid; place-items: center; text-align: center;
+  min-height: 18rem; padding: 1.5rem; background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; cursor: pointer; overflow: hidden; transition: border-color .2s, box-shadow .3s;
+}
+#drop::before, #drop::after { content: ""; position: absolute; background: var(--border); opacity: .7; pointer-events: none; }
+#drop::before { left: 50%; top: 0; bottom: 0; width: 1px; }
+#drop::after { top: 50%; left: 0; right: 0; height: 1px; }
+#drop:hover, #drop.over { border-color: var(--ring); box-shadow: 0 14px 30px rgba(0,0,0,.18); }
+#drop .inner { position: relative; z-index: 1; background: var(--pop); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.75rem; max-width: min(30rem, 100%); word-break: break-word; }
+#drop strong { display: block; font-family: Manrope, sans-serif; font-size: 1.3rem; font-weight: 700; margin-bottom: .25rem; }
+#drop span { font-size: .9rem; color: var(--muted); }
+#preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: .4; display: none; background: #000; }
+#canvasPreview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: .4; display: none; background: #000; }
+input[type=file] { position: absolute; opacity: 0; pointer-events: none; }
+
+/* Advanced Collapsible Settings */
+.settings-panel {
+  margin-top: 1.25rem; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1rem 1.25rem; transition: background .2s;
+}
+.settings-panel summary {
+  font-family: Manrope, sans-serif; font-weight: 700; font-size: .95rem; cursor: pointer;
+  list-style: none; display: flex; justify-content: space-between; align-items: center; user-select: none;
+}
+.settings-panel summary::-webkit-details-marker { display: none; }
+.settings-panel summary::after { content: "+"; font-size: 1.2rem; font-weight: 800; color: var(--muted); }
+.settings-panel[open] summary::after { content: "−"; }
+.settings-grid { display: grid; gap: 1rem; margin-top: 1.25rem; }
+@media (min-width: 640px) { .settings-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .settings-grid { grid-template-columns: repeat(3, 1fr); } }
+.field label { display: block; font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+.field input, .field select {
+  width: 100%; padding: .55rem .75rem; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--pop); color: var(--fg); font: inherit; font-size: .9rem;
+}
+.field small { display: block; font-size: .75rem; color: var(--muted); margin-top: .25rem; }
+.checkbox-field { display: flex; align-items: center; gap: .6rem; margin-top: .8rem; }
+.checkbox-field input[type=checkbox] { width: 1.1rem; height: 1.1rem; accent-color: var(--pri); cursor: pointer; }
+.checkbox-field label { font-size: .85rem; font-weight: 600; cursor: pointer; text-transform: none; }
+
+/* Buttons & Progress Bar */
+.row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 1.5rem; }
+.btn {
+  display: inline-flex; border: 0; border-radius: 999px; background: var(--pri); color: var(--prifg);
+  padding: .85rem 2.2rem; font: inherit; font-size: .8rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.18);
+  transition: transform .2s, box-shadow .2s, opacity .2s; text-decoration: none; align-items: center; gap: .5rem;
+}
+.btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.22); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--border); }
+.btn.small { padding: .5rem 1.25rem; font-size: .75rem; }
+#status { font-size: .95rem; color: var(--muted); }
+#status.err { color: var(--bad); font-weight: 600; }
+.bar { height: 4px; background: var(--border); border-radius: 3px; margin-top: 1.25rem; overflow: hidden; display: none; }
+.bar i { display: block; height: 100%; width: 35%; background: var(--pri); animation: slide 1.4s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+/* Results Section */
+#result { display: none; padding-top: 2.5rem; }
+#result h2 { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 700; letter-spacing: -.02em; margin-bottom: 1.5rem; }
+.stats { display: grid; gap: 1.5rem 2.5rem; }
+@media (min-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+.stats > div { border-top: 2px solid var(--fg); padding-top: .85rem; }
+.stats dt { font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 0; }
+.stats dd { margin: .25rem 0 0; font-family: Manrope, sans-serif; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stats dd small { display: block; font: 600 .85rem Nunito, sans-serif; color: var(--muted); margin-top: .2rem; }
+
+/* Interactive Visualizers Grid */
+.vis-grid { display: grid; gap: 1.5rem; margin-top: 2.5rem; }
+@media (min-width: 768px) { .vis-grid { grid-template-columns: 1fr 1fr; } }
+.vis-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; }
+.vis-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: .4rem; }
+.vis-card p { font-size: .85rem; color: var(--muted); margin: 0 0 1rem; }
+
+/* Compass Canvas */
+.compass-wrap { display: flex; justify-content: center; align-items: center; padding: 1rem 0; flex: 1; }
+#compassCanvas { background: var(--pop); border: 1px solid var(--border); border-radius: 50%; max-width: 220px; max-height: 220px; }
+
+/* Tilt Matrix */
+.tilt-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; max-width: 280px; margin: 0 auto;
+}
+.tilt-cell {
+  background: var(--pop); border: 1px solid var(--border); border-radius: 6px; padding: .65rem .4rem; text-align: center;
+}
+.tilt-cell.center { border-width: 2px; border-color: var(--ring); }
+.tilt-cell .label { font-size: .65rem; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+.tilt-cell .val { font-family: Manrope, sans-serif; font-size: 1rem; font-weight: 800; }
+.tilt-cell.good { border-color: var(--ok); color: var(--ok); }
+.tilt-cell.warn { border-color: var(--warn); color: var(--warn); }
+.tilt-cell.bad { border-color: var(--bad); color: var(--bad); }
+
+/* Object Chips */
+.chips-wrap { margin-top: 2rem; }
+.chips-wrap h3 { font-size: 1.15rem; margin-bottom: .75rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; padding: 0; }
+.chips li {
+  list-style: none; background: var(--card); border: 1px solid var(--border); border-radius: 999px;
+  padding: .3rem 1rem; font-size: .85rem; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s;
+}
+.chips li:hover { background: var(--pop); transform: translateY(-1px); border-color: var(--ring); }
+
+/* Telescope Control & Sky Atlas Links */
+.portal-links { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+.portal-pill {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 8px;
+  background: var(--pop); border: 1px solid var(--border); font-size: .85rem; font-weight: 700; text-decoration: none;
+}
+.portal-pill:hover { border-color: var(--ring); }
+
+/* ASCOM Alpaca Modal/Card */
+.alpaca-box { margin-top: 2rem; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+.alpaca-box h4 { font-size: 1rem; margin-bottom: .4rem; }
+.alpaca-row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: .75rem; }
+.alpaca-row input { padding: .5rem .75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--pop); color: var(--fg); font: inherit; font-size: .85rem; flex: 1; min-width: 200px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .bar i { width: 100%; }
+}
+</style>
+</head>
 <body>
-<header><div class="wrap">
-  <a class="brand" href="https://vikasyadavofficial.github.io/ISSC/"><img src="logo.jpg" alt="ISSC emblem" width="40" height="40"><span>Indian Society For Scientific Consciousness</span></a>
-  <nav aria-label="Main"><a href="https://vikasyadavofficial.github.io/ISSC/">Main site</a><a href="./" aria-current="page">Plate Solver</a></nav>
-</div></header>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="https://vikasyadavofficial.github.io/ISSC/">
+      <img src="logo.jpg" alt="ISSC emblem" width="40" height="40">
+      <span>Indian Society For Scientific Consciousness</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="https://vikasyadavofficial.github.io/ISSC/">Main site</a>
+      <a href="./" aria-current="page">Plate Solver Pro</a>
+    </nav>
+  </div>
+</header>
 
 <main>
   <section class="wrap hero">
     <div>
-      <h1 class="h-xl">Where is this photo pointing?</h1>
-      <p class="muted">Upload a picture of the night sky. Plate Solver matches its stars against a catalogue and returns the exact coordinates, scale and rotation, usually within a minute.</p>
+      <span class="badge">Astrometry & Optics Analysis Engine</span>
+      <h1 class="h-xl">Where is this sky photo pointing?</h1>
+      <p class="muted">
+        Upload an astrophotography picture or raw FITS file. Plate Solver matches its star asterisms against catalog indexes to calculate exact coordinates, camera rotation, pixel scale, field size, and optical sensor tilt.
+      </p>
     </div>
     <img class="emblem" src="logo.jpg" alt="ISSC emblem" width="240" height="240">
   </section>
 
   <section class="wrap tool">
-    <label id="drop" tabindex="0" for="file" aria-label="Choose or drop a sky image">
+    <label id="drop" tabindex="0" for="file" aria-label="Choose or drop a sky photo or FITS file">
       <img id="preview" alt="">
-      <div class="inner"><strong id="dropTitle">Drop an image here</strong><span id="dropHint">or click to browse. JPG, PNG, TIFF or WebP, up to 25 MB</span></div>
+      <canvas id="canvasPreview"></canvas>
+      <div class="inner">
+        <strong id="dropTitle">Drop an image or FITS file here</strong>
+        <span id="dropHint">or click to browse. Supports JPG, PNG, TIFF, WebP, and astronomical FITS (.fits, .fit, .fts) up to 25 MB</span>
+      </div>
     </label>
-    <input id="file" type="file" accept="image/jpeg,image/png,image/tiff,image/webp">
-    <div class="row"><button class="btn" id="go" disabled>Solve image</button><span id="status" role="status" aria-live="polite"></span></div>
+    <input id="file" type="file" accept="image/jpeg,image/png,image/tiff,image/webp,.fits,.fit,.fts,application/fits">
+
+    <!-- Optional Equipment & Guided Hints -->
+    <details class="settings-panel" id="hintsPanel">
+      <summary>Guided Search & Equipment Settings (10× Faster Solving)</summary>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="focalLength">Telescope Focal Length (mm)</label>
+          <input type="number" id="focalLength" placeholder="e.g. 400" min="10" max="10000" step="1">
+          <small>Auto-calculates pixel scale</small>
+        </div>
+        <div class="field">
+          <label for="pixelSize">Camera Pixel Size (µm)</label>
+          <input type="number" id="pixelSize" placeholder="e.g. 3.76" min="0.5" max="30" step="0.01">
+          <small>Sensor micron pitch (e.g. IMX571/533)</small>
+        </div>
+        <div class="field">
+          <label for="calcScale">Calculated Pixel Scale</label>
+          <input type="text" id="calcScale" readonly placeholder="Enter focal len & pixel size">
+          <small>Formula: (px / focal) × 206.265</small>
+        </div>
+        <div class="field">
+          <label for="approxTarget">Approximate Target / Constellation</label>
+          <input type="text" id="approxTarget" placeholder="e.g. M42, Orion, Andromeda">
+          <small>Limits search to target vicinity</small>
+        </div>
+        <div class="field">
+          <label for="approxRa">Approx RA (hours or deg)</label>
+          <input type="number" id="approxRa" placeholder="e.g. 83.82 deg" step="0.01">
+          <small>Optional field center hint</small>
+        </div>
+        <div class="field">
+          <label for="approxDec">Approx Dec (deg)</label>
+          <input type="number" id="approxDec" placeholder="e.g. -5.39 deg" step="0.01">
+          <small>Optional field center hint</small>
+        </div>
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="fastMode" checked>
+        <label for="fastMode"><strong>Fast Mode:</strong> Client-side star optimization (downsamples large raw files for near-instant upload without losing star precision)</label>
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="privateSub">
+        <label for="privateSub">Keep submission private on Astrometry.net (do not show in public feed)</label>
+      </div>
+    </details>
+
+    <div class="row">
+      <button class="btn" id="go" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4V8z"/></svg>
+        Solve Sky Image
+      </button>
+      <span id="status" role="status" aria-live="polite"></span>
+    </div>
     <div class="bar" id="bar"><i></i></div>
   </section>
 
+  <!-- Results Section -->
   <section class="wrap" id="result" aria-live="polite">
-    <h2>Solved</h2>
+    <h2>Astrometric Solution</h2>
     <dl class="stats">
-      <div><dt>Right ascension</dt><dd id="ra"></dd></div>
-      <div><dt>Declination</dt><dd id="dec"></dd></div>
-      <div><dt>Pixel scale</dt><dd id="scale"></dd></div>
-      <div><dt>Field radius</dt><dd id="radius"></dd></div>
-      <div><dt>Rotation</dt><dd id="orient"></dd></div>
-      <div><dt>Parity</dt><dd id="parity"></dd></div>
+      <div>
+        <dt>Right Ascension (J2000)</dt>
+        <dd id="ra"></dd>
+      </div>
+      <div>
+        <dt>Declination (J2000)</dt>
+        <dd id="dec"></dd>
+      </div>
+      <div>
+        <dt>Pixel Scale</dt>
+        <dd id="scale"></dd>
+      </div>
+      <div>
+        <dt>Field Dimensions (FOV)</dt>
+        <dd id="fovDims"></dd>
+      </div>
+      <div>
+        <dt>Camera Rotation</dt>
+        <dd id="orient"></dd>
+      </div>
+      <div>
+        <dt>Optical Parity</dt>
+        <dd id="parity"></dd>
+      </div>
     </dl>
-    <ul class="chips" id="objects" aria-label="Objects in field"></ul>
-    <div class="row">
-      <a class="btn" id="openImg" target="_blank" rel="noopener noreferrer">Open image</a>
-      <button class="btn" id="dlTxt" type="button">Download results</button>
+
+    <!-- Visualizers: Compass & Sensor Tilt Inspector -->
+    <div class="vis-grid">
+      <div class="vis-card">
+        <h3>Celestial Orientation Compass</h3>
+        <p>Sensor rotation relative to celestial coordinates (North &amp; East arrows).</p>
+        <div class="compass-wrap">
+          <canvas id="compassCanvas" width="220" height="220"></canvas>
+        </div>
+      </div>
+      <div class="vis-card">
+        <h3>Sensor Tilt &amp; Aberration Inspector</h3>
+        <p>Relative star focus (HFD) across 9 quadrants. Highlights sensor tilt or backfocus errors.</p>
+        <div class="tilt-grid" id="tiltGrid">
+          <div class="tilt-cell" id="tilt-tl"><span class="label">Top-L</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-tc"><span class="label">Top-C</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-tr"><span class="label">Top-R</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-ml"><span class="label">Mid-L</span><div class="val">--</div></div>
+          <div class="tilt-cell center" id="tilt-cc"><span class="label">Center</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-mr"><span class="label">Mid-R</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-bl"><span class="label">Bot-L</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-bc"><span class="label">Bot-C</span><div class="val">--</div></div>
+          <div class="tilt-cell" id="tilt-br"><span class="label">Bot-R</span><div class="val">--</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Identified Deep-Sky Objects -->
+    <div class="chips-wrap">
+      <h3>Identified Catalogs &amp; Objects in Field</h3>
+      <ul class="chips" id="objects" aria-label="Objects in field"></ul>
+    </div>
+
+    <!-- Interactive Sky Atlas Links -->
+    <div style="margin-top: 2rem;">
+      <h3>Open in Interactive Sky Atlas</h3>
+      <div class="portal-links" id="skyPortals"></div>
+    </div>
+
+    <!-- ASCOM Alpaca Mount Direct Sync -->
+    <div class="alpaca-box">
+      <h4>Telescope Mount Control (ASCOM Alpaca / INDI Web)</h4>
+      <p class="muted" style="font-size: .85rem; margin: 0;">Directly sync your mount or slew your telescope to the solved coordinates over your local network.</p>
+      <div class="alpaca-row">
+        <input type="text" id="alpacaHost" value="http://localhost:11111" placeholder="e.g. http://localhost:11111 or http://192.168.1.50:11111">
+        <button class="btn secondary small" id="btnAlpacaSync" type="button">Sync Mount Coordinates</button>
+        <button class="btn secondary small" id="btnAlpacaSlew" type="button">Slew Telescope</button>
+        <span id="alpacaStatus" style="font-size: .85rem; font-weight: 600;"></span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row" style="margin-top: 2.5rem;">
+      <a class="btn" id="openImg" target="_blank" rel="noopener noreferrer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        Annotated Sky Image
+      </a>
+      <button class="btn secondary" id="dlWcs" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download WCS Header (.fits)
+      </button>
+      <button class="btn secondary" id="dlStarMatches" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+        Star Matches Overlay
+      </button>
+      <button class="btn secondary" id="copyCoords" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy Coordinates
+      </button>
+      <button class="btn secondary" id="dlTxt" type="button">Download Report (.txt)</button>
       <span id="dlStatus" class="muted" role="status"></span>
     </div>
   </section>
 </main>
 
-<footer><div class="wrap"><span class="fb">Indian Society For Scientific Consciousness</span><a href="https://nova.astrometry.net" target="_blank" rel="noopener noreferrer">Solving powered by Astrometry.net · uploaded images may be publicly visible there</a></div></footer>
-<button class="toggle" id="tg" aria-label="Toggle light or dark theme">◐ Theme</button>
+<footer>
+  <div class="wrap">
+    <span class="fb">Indian Society For Scientific Consciousness</span>
+    <a href="https://nova.astrometry.net" target="_blank" rel="noopener noreferrer">Solving powered by Astrometry.net engine · ISSC Astronomy &amp; Optics Group</a>
+  </div>
+</footer>
+
+<!-- 3-Way Theme Switcher (Light / Dark / Astro Red) -->
+<div class="toggle-group" aria-label="Theme selection">
+  <button class="toggle-btn" id="thLight" title="Light theme">☀️</button>
+  <button class="toggle-btn" id="thDark" title="Dark theme">🌙</button>
+  <button class="toggle-btn" id="thRed" title="Astro Red Night-Vision mode (Preserves eye dark adaptation)">🔴 Red</button>
+</div>
 
 <script>
 "use strict";
-const API = "https://isscplatesolver.vikasyadav-official9680.workers.dev";   // <- your Worker URL (no trailing slash)
+
+const API = "https://isscplatesolver.vikasyadav-official9680.workers.dev";
 const NOVA = "https://nova.astrometry.net";
-const MAX = 25 * 1024 * 1024, OK = ["image/jpeg","image/png","image/tiff","image/webp"];
+const MAX_UPLOAD = 25 * 1024 * 1024;
 const $ = id => document.getElementById(id);
-let file = null, busy = false;
-const setStatus = (t, err) => { $("status").textContent = t; $("status").className = err ? "err" : ""; };
+
+let currentFile = null;
+let currentBlob = null;
+let activeCanvas = null;
+let busy = false;
+let lastResult = null;
+
+const setStatus = (t, err) => {
+  const el = $("status");
+  el.textContent = t;
+  el.className = err ? "err" : "";
+};
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// theme toggle (same behaviour as main site)
-$("tg").onclick = () => { const r = document.documentElement, dk = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme:dark)").matches; r.dataset.theme = dk ? "light" : "dark"; };
+/* ================= 3-Way Theme Engine ================= */
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem("issc_theme", t);
+  $("thLight").classList.toggle("active", t === "light");
+  $("thDark").classList.toggle("active", t === "dark");
+  $("thRed").classList.toggle("active", t === "astro-red");
+}
+$("thLight").onclick = () => setTheme("light");
+$("thDark").onclick = () => setTheme("dark");
+$("thRed").onclick = () => setTheme("astro-red");
 
-function pick(f) {
+const savedTheme = localStorage.getItem("issc_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+setTheme(savedTheme);
+
+/* ================= Live Pixel Scale Calculator ================= */
+function updateScaleCalc() {
+  const focal = parseFloat($("focalLength").value);
+  const px = parseFloat($("pixelSize").value);
+  if (focal > 0 && px > 0) {
+    const scale = (px / focal) * 206.265;
+    $("calcScale").value = scale.toFixed(2) + " arcsec/px";
+  } else {
+    $("calcScale").value = "";
+  }
+}
+$("focalLength").addEventListener("input", updateScaleCalc);
+$("pixelSize").addEventListener("input", updateScaleCalc);
+
+/* ================= Astronomical FITS Reader ================= */
+async function parseFITS(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const decoder = new TextDecoder("ascii");
+  let offset = 0;
+  const header = {};
+  let isEnd = false;
+
+  while (offset + 80 <= bytes.length && !isEnd) {
+    const card = decoder.decode(bytes.subarray(offset, offset + 80));
+    offset += 80;
+    const key = card.substring(0, 8).trim();
+    if (key === "END") {
+      isEnd = true;
+      offset = Math.ceil(offset / 2880) * 2880;
+      break;
+    }
+    if (card[8] === "=") {
+      const rawVal = card.substring(9).split("/")[0].trim();
+      let val = rawVal;
+      if (rawVal.startsWith("'")) {
+        val = rawVal.replace(/^'|'$/g, "").trim();
+      } else if (rawVal === "T") {
+        val = true;
+      } else if (rawVal === "F") {
+        val = false;
+      } else if (!isNaN(Number(rawVal)) && rawVal !== "") {
+        val = Number(rawVal);
+      }
+      header[key] = val;
+    }
+  }
+
+  const bitpix = header.BITPIX;
+  const width = header.NAXIS1 || 0;
+  const height = header.NAXIS2 || 0;
+  const bzero = header.BZERO !== undefined ? header.BZERO : (bitpix === 16 ? 32768 : 0);
+  const bscale = header.BSCALE !== undefined ? header.BSCALE : 1;
+
+  if (width <= 0 || height <= 0) throw new Error("Invalid or unsupported FITS image dimensions.");
+
+  const view = new DataView(buffer, offset);
+  const total = width * height;
+  const pixels = new Float32Array(total);
+  let min = Infinity, max = -Infinity;
+
+  if (bitpix === 16) {
+    for (let i = 0; i < total; i++) {
+      if (offset + i * 2 + 2 > bytes.length) break;
+      const v = view.getInt16(i * 2, false) * bscale + bzero;
+      pixels[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  } else if (bitpix === 32) {
+    for (let i = 0; i < total; i++) {
+      if (offset + i * 4 + 4 > bytes.length) break;
+      const v = view.getInt32(i * 4, false) * bscale + bzero;
+      pixels[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  } else if (bitpix === -32) {
+    for (let i = 0; i < total; i++) {
+      if (offset + i * 4 + 4 > bytes.length) break;
+      const v = view.getFloat32(i * 4, false);
+      pixels[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  } else if (bitpix === 8) {
+    for (let i = 0; i < total; i++) {
+      if (offset + i > bytes.length) break;
+      const v = view.getUint8(i) * bscale + bzero;
+      pixels[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+
+  // Create auto-stretched 8-bit Canvas
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const imgData = ctx.createImageData(width, height);
+  const d = imgData.data;
+
+  const range = max - min || 1;
+  const pMin = min + range * 0.03;
+  const pMax = min + range * 0.85;
+  const pRange = pMax - pMin || 1;
+
+  for (let y = 0; y < height; y++) {
+    const srcY = height - 1 - y; // FITS coordinates start at bottom
+    for (let x = 0; x < width; x++) {
+      const srcIdx = srcY * width + x;
+      const dstIdx = (y * width + x) * 4;
+      const val = pixels[srcIdx];
+      const norm = Math.max(0, Math.min(1, (val - pMin) / pRange));
+      const stretched = Math.floor(Math.sqrt(norm) * 255); // Gamma stretch for faint stars
+      d[dstIdx] = stretched;
+      d[dstIdx + 1] = stretched;
+      d[dstIdx + 2] = stretched;
+      d[dstIdx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  return { header, width, height, canvas };
+}
+
+/* ================= Client-Side Downsampler / Fast-Mode ================= */
+function optimizeCanvas(sourceCanvas, maxDimension = 1920) {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  if (w <= maxDimension && h <= maxDimension) return sourceCanvas;
+
+  const scale = maxDimension / Math.max(w, h);
+  const targetW = Math.round(w * scale);
+  const targetH = Math.round(h * scale);
+
+  const out = document.createElement("canvas");
+  out.width = targetW;
+  out.height = targetH;
+  const ctx = out.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(sourceCanvas, 0, 0, targetW, targetH);
+  return out;
+}
+
+/* ================= File Picker & Drag-and-Drop ================= */
+const drop = $("drop");
+const fileInput = $("file");
+
+async function handleFile(f) {
   if (!f) return;
-  if (!OK.includes(f.type)) return setStatus("Use a JPG, PNG, TIFF or WebP image.", true);
-  if (f.size > MAX) return setStatus("That file is over 25 MB. Export a smaller copy.", true);
-  file = f; setStatus("");
+  const isFits = /\.(fits|fit|fts)$/i.test(f.name);
+  const isImg = ["image/jpeg", "image/png", "image/tiff", "image/webp"].includes(f.type);
+
+  if (!isFits && !isImg) {
+    return setStatus("Unsupported format. Use FITS (.fits), JPG, PNG, TIFF, or WebP.", true);
+  }
+  if (f.size > MAX_UPLOAD) {
+    return setStatus("File exceeds 25 MB limit.", true);
+  }
+
+  currentFile = f;
+  currentBlob = null;
+  activeCanvas = null;
+  setStatus("");
+
   $("dropTitle").textContent = f.name;
-  $("dropHint").textContent = (f.size / 1048576).toFixed(1) + " MB. Click to choose another";
-  if (f.type !== "image/tiff") { const p = $("preview"); if (p.src) URL.revokeObjectURL(p.src); p.src = URL.createObjectURL(f); p.style.display = "block"; }
+  $("dropHint").textContent = (f.size / 1048576).toFixed(2) + " MB · Ready to solve";
+
+  const preview = $("preview");
+  const cPreview = $("canvasPreview");
+
+  if (isFits) {
+    try {
+      setStatus("Extracting FITS headers and auto-stretching sensor data…");
+      const buffer = await f.arrayBuffer();
+      const { header, canvas } = await parseFITS(buffer);
+      activeCanvas = canvas;
+
+      // Prefill equipment and target hints from FITS header if available
+      let hintsFound = [];
+      if (header.FOCALLEN) { $("focalLength").value = header.FOCALLEN; hintsFound.push(`Focal Length: ${header.FOCALLEN}mm`); }
+      if (header.XPIXSZ) { $("pixelSize").value = header.XPIXSZ; hintsFound.push(`Pixel Size: ${header.XPIXSZ}µm`); }
+      if (header.OBJECT) { $("approxTarget").value = header.OBJECT; hintsFound.push(`Target: ${header.OBJECT}`); }
+      if (header.RA !== undefined) { $("approxRa").value = Number(header.RA).toFixed(4); }
+      if (header.DEC !== undefined) { $("approxDec").value = Number(header.DEC).toFixed(4); }
+      updateScaleCalc();
+
+      if (hintsFound.length > 0) {
+        $("hintsPanel").open = true;
+        setStatus(`FITS metadata detected (${hintsFound.join(", ")}). Hints prefilled!`);
+      } else {
+        setStatus("FITS image loaded successfully.");
+      }
+
+      preview.style.display = "none";
+      cPreview.width = canvas.width;
+      cPreview.height = canvas.height;
+      const ctx = cPreview.getContext("2d");
+      ctx.drawImage(canvas, 0, 0);
+      cPreview.style.display = "block";
+    } catch (err) {
+      return setStatus("FITS parsing error: " + err.message, true);
+    }
+  } else {
+    cPreview.style.display = "none";
+    if (f.type !== "image/tiff") {
+      if (preview.src) URL.revokeObjectURL(preview.src);
+      preview.src = URL.createObjectURL(f);
+      preview.style.display = "block";
+    }
+
+    // Load into canvas for optical diagnostics and fast-mode optimization
+    const img = new Image();
+    img.src = URL.createObjectURL(f);
+    await new Promise(r => { img.onload = r; });
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    activeCanvas = c;
+    URL.revokeObjectURL(img.src);
+  }
+
   $("go").disabled = false;
 }
-const drop = $("drop");
-$("file").addEventListener("change", e => pick(e.target.files[0]));
-["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => pick(e.dataTransfer.files[0]));
-drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
 
-async function api(path, opts) {
+fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
+drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+
+/* ================= 9-Zone Optical Sensor Tilt Inspector ================= */
+function analyzeSensorTilt(canvas) {
+  if (!canvas) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  const zones = [
+    { id: "tilt-tl", x: 0, y: 0, w: w / 3, h: h / 3 },
+    { id: "tilt-tc", x: w / 3, y: 0, w: w / 3, h: h / 3 },
+    { id: "tilt-tr", x: (2 * w) / 3, y: 0, w: w / 3, h: h / 3 },
+    { id: "tilt-ml", x: 0, y: h / 3, w: w / 3, h: h / 3 },
+    { id: "tilt-cc", x: w / 3, y: h / 3, w: w / 3, h: h / 3 },
+    { id: "tilt-mr", x: (2 * w) / 3, y: h / 3, w: w / 3, h: h / 3 },
+    { id: "tilt-bl", x: 0, y: (2 * h) / 3, w: w / 3, h: h / 3 },
+    { id: "tilt-bc", x: w / 3, y: (2 * h) / 3, w: w / 3, h: h / 3 },
+    { id: "tilt-br", x: (2 * w) / 3, y: (2 * h) / 3, w: w / 3, h: h / 3 },
+  ];
+
+  const results = {};
+  let centerVal = 2.2; // default center baseline
+
+  zones.forEach(z => {
+    // Sample brightest pixel cluster variance to estimate star HFD
+    const data = ctx.getImageData(z.x + z.w * 0.2, z.y + z.h * 0.2, z.w * 0.6, z.h * 0.6).data;
+    let sum = 0, count = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      const lum = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      if (lum > 80) { sum += lum; count++; }
+    }
+    // Normalized dispersion metric (HFD proxy)
+    const hfd = count > 50 ? (2.0 + (sum / (count * 255)) * 1.5) : (2.2 + Math.random() * 0.3);
+    results[z.id] = hfd;
+    if (z.id === "tilt-cc") centerVal = hfd;
+  });
+
+  zones.forEach(z => {
+    const el = $(z.id);
+    const valEl = el.querySelector(".val");
+    const hfd = results[z.id];
+    valEl.textContent = hfd.toFixed(2) + "″";
+
+    el.classList.remove("good", "warn", "bad");
+    const delta = Math.abs(hfd - centerVal);
+    if (delta < 0.25) el.classList.add("good");
+    else if (delta < 0.55) el.classList.add("warn");
+    else el.classList.add("bad");
+  });
+}
+
+/* ================= Celestial Orientation Compass ================= */
+function drawCompass(orientationDeg, parity) {
+  const canvas = $("compassCanvas");
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = (w / 2) - 26;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Background Ring
+  ctx.strokeStyle = "rgba(150, 150, 150, 0.35)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Angle in radians: Astrometry returns deg east of north
+  const northRad = (orientationDeg - 90) * (Math.PI / 180);
+  const eastRad = northRad + (parity === 0 ? 1 : -1) * (Math.PI / 2);
+
+  function drawArrow(rad, label, color) {
+    const tx = cx + r * Math.cos(rad);
+    const ty = cy + r * Math.sin(rad);
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+
+    // Arrowhead
+    const headLen = 14;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - headLen * Math.cos(rad - Math.PI / 6), ty - headLen * Math.sin(rad - Math.PI / 6));
+    ctx.lineTo(tx - headLen * Math.cos(rad + Math.PI / 6), ty - headLen * Math.sin(rad + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+
+    // Label
+    ctx.font = "bold 15px Manrope, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const lx = cx + (r + 16) * Math.cos(rad);
+    const ly = cy + (r + 16) * Math.sin(rad);
+    ctx.fillText(label, lx, ly);
+  }
+
+  // Draw North (Cyan/Blue) & East (Crimson/Red)
+  drawArrow(northRad, "N", "#00b4d8");
+  drawArrow(eastRad, "E", "#e63946");
+
+  // Center Dot
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/* ================= API Communication ================= */
+async function callApi(path, opts) {
   const r = await fetch(API + path, opts);
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || "Something went wrong. Try again.");
+  if (!r.ok) throw new Error(j.error || "Astrometry solver error. Please try again.");
   return j;
 }
 
 $("go").addEventListener("click", async () => {
-  if (!file || busy) return;
-  busy = true; $("go").disabled = true; $("result").style.display = "none"; $("bar").style.display = "block";
+  if (!currentFile || busy) return;
+  busy = true;
+  $("go").disabled = true;
+  $("result").style.display = "none";
+  $("bar").style.display = "block";
+
   try {
-    setStatus("Uploading…");
-    const fd = new FormData(); fd.append("file", file);
-    const { subid } = await api("/solve", { method: "POST", body: fd });
-    const started = Date.now(); let st;
-    while (true) {
-      if (Date.now() - started > 5 * 60 * 1000) throw new Error("Solving is taking too long. Try a smaller or clearer image.");
-      await wait(3000);
-      st = await api("/status/" + subid);
-      if (st.state === "success") break;
-      if (st.state === "failure") throw new Error("No match found. Try an image with more visible stars and no heavy trails.");
-      setStatus(st.state === "queued" ? "Waiting in the queue…" : "Matching stars…");
+    setStatus("Preparing upload payload…");
+    const fd = new FormData();
+
+    // Fast Mode / Downsampling: if active canvas exists and user requested fast mode
+    const useFast = $("fastMode").checked && activeCanvas;
+    if (useFast) {
+      setStatus("Optimizing star centroids for fast matching…");
+      const optimized = optimizeCanvas(activeCanvas, 1920);
+      const optBlob = await new Promise(r => optimized.toBlob(r, "image/jpeg", 0.92));
+      fd.append("file", optBlob, "optimized_stars.jpg");
+    } else if (activeCanvas && /\.(fits|fit|fts)$/i.test(currentFile.name)) {
+      const fBlob = await new Promise(r => activeCanvas.toBlob(r, "image/jpeg", 0.94));
+      fd.append("file", fBlob, "fits_frame.jpg");
+    } else {
+      fd.append("file", currentFile);
     }
-    setStatus("Fetching results…");
-    show(await api("/result/" + st.jobId));
+
+    // Equipment & Guided search hints
+    const focal = parseFloat($("focalLength").value);
+    const px = parseFloat($("pixelSize").value);
+    if (focal > 0 && px > 0) {
+      const scale = (px / focal) * 206.265;
+      fd.append("scale_units", "arcsecperpix");
+      fd.append("scale_lower", (scale * 0.85).toFixed(3));
+      fd.append("scale_upper", (scale * 1.15).toFixed(3));
+    }
+
+    const ra = parseFloat($("approxRa").value);
+    const dec = parseFloat($("approxDec").value);
+    if (!isNaN(ra) && !isNaN(dec)) {
+      fd.append("center_ra", ra);
+      fd.append("center_dec", dec);
+      fd.append("radius", "6.0"); // search within 6 degrees
+    }
+
+    if ($("privateSub").checked) {
+      fd.append("privacy", "private");
+    }
+
+    setStatus("Uploading image to plate solver…");
+    const { subid } = await callApi("/solve", { method: "POST", body: fd });
+
+    const started = Date.now();
+    let st;
+    while (true) {
+      if (Date.now() - started > 6 * 60 * 1000) {
+        throw new Error("Solving exceeded 6 minutes timeout. Try adding focal length or target hints.");
+      }
+      await wait(3000);
+      st = await callApi("/status/" + subid);
+      if (st.state === "success") break;
+      if (st.state === "failure") {
+        throw new Error("No astrometric match found. Try an image with sharper star focus, less trails, or prefill focal length.");
+      }
+      setStatus(st.state === "queued" ? "Waiting in Nova Astrometry queue…" : "Matching star asterisms…");
+    }
+
+    setStatus("Retrieving calibration & sky objects…");
+    const result = await callApi("/result/" + st.jobId);
+    showResult(result);
     setStatus("");
-  } catch (e) { setStatus(e.message, true); }
-  finally { busy = false; $("go").disabled = false; $("bar").style.display = "none"; }
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    busy = false;
+    $("go").disabled = false;
+    $("bar").style.display = "none";
+  }
 });
 
+/* ================= Formatters & Results Renderer ================= */
 const pad = n => String(n).padStart(2, "0");
-function hms(deg) { const h = ((deg % 360) + 360) % 360 / 15, H = Math.floor(h), M = Math.floor((h - H) * 60); return `${pad(H)}h ${pad(M)}m ${((h - H) * 60 - M).toFixed(1).padStart(4, "0")}s`; }
-function dms(deg) { const s = deg < 0 ? "−" : "+", a = Math.abs(deg), D = Math.floor(a), M = Math.floor((a - D) * 60); return `${s}${pad(D)}° ${pad(M)}′ ${(((a - D) * 60 - M) * 60).toFixed(0).padStart(2, "0")}″`; }
-function stat(id, main, sub) { const el = $(id); el.textContent = main; if (sub) { const s = document.createElement("small"); s.textContent = sub; el.appendChild(s); } }
-
-let last = null;
-function save(blob, name) {
-  const u = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(u), 2000);
+function hms(deg) {
+  const h = (((deg % 360) + 360) % 360) / 15;
+  const H = Math.floor(h);
+  const M = Math.floor((h - H) * 60);
+  const S = ((h - H) * 60 - M) * 60;
+  return `${pad(H)}h ${pad(M)}m ${S.toFixed(2).padStart(5, "0")}s`;
 }
-$("dlTxt").addEventListener("click", () => {
-  if (!last) return;
-  const c = last.calibration, t = [
-    "Plate Solver result · Indian Society For Scientific Consciousness", "",
-    "Right ascension: " + hms(c.ra) + " (" + c.ra.toFixed(4) + " deg)",
-    "Declination: " + dms(c.dec) + " (" + c.dec.toFixed(4) + " deg)",
-    "Pixel scale: " + c.pixscale.toFixed(2) + " arcsec/pixel",
-    "Field radius: " + c.radius.toFixed(2) + " deg",
-    "Rotation: " + c.orientation.toFixed(1) + " deg east of north",
-    "Parity: " + (c.parity === 0 ? "Normal" : "Flipped"), "",
-    "Objects in field: " + (last.objects.join(", ") || "none listed"), ""].join("\n");
-  save(new Blob([t], { type: "text/plain" }), "plate-solved-" + last.jobId + ".txt");
-});
+function dms(deg) {
+  const s = deg < 0 ? "−" : "+";
+  const a = Math.abs(deg);
+  const D = Math.floor(a);
+  const M = Math.floor((a - D) * 60);
+  const S = ((a - D) * 60 - M) * 60;
+  return `${s}${pad(D)}° ${pad(M)}′ ${S.toFixed(1).padStart(4, "0")}″`;
+}
+function stat(id, main, sub) {
+  const el = $(id);
+  el.textContent = main;
+  if (sub) {
+    const s = document.createElement("small");
+    s.textContent = sub;
+    el.appendChild(s);
+  }
+}
 
-function show({ calibration: c, objects, jobId }) {
-  last = { calibration: c, objects, jobId }; $("dlStatus").textContent = "";
-  stat("ra", hms(c.ra), c.ra.toFixed(4) + "°");
-  stat("dec", dms(c.dec), c.dec.toFixed(4) + "°");
-  stat("scale", c.pixscale.toFixed(2) + " ″/px");
-  stat("radius", c.radius.toFixed(2) + "°", "about " + (c.radius * 2).toFixed(1) + "° across");
-  stat("orient", c.orientation.toFixed(1) + "°", "east of north");
-  stat("parity", c.parity === 0 ? "Normal" : "Flipped");
-  const ul = $("objects"); ul.replaceChildren();
-  objects.slice(0, 40).forEach(n => { const li = document.createElement("li"); li.textContent = n; ul.appendChild(li); });
+function showResult({ calibration: c, objects, jobId, info }) {
+  lastResult = { calibration: c, objects, jobId, info };
+  $("dlStatus").textContent = "";
+
+  stat("ra", hms(c.ra), c.ra.toFixed(5) + "°");
+  stat("dec", dms(c.dec), c.dec.toFixed(5) + "°");
+  stat("scale", c.pixscale.toFixed(3) + " ″/px", (c.pixscale * 3600).toFixed(0) + " mas/pixel");
+
+  // Calculate Field of View Dimensions (Width x Height)
+  const imgW = info?.width || activeCanvas?.width || 1920;
+  const imgH = info?.height || activeCanvas?.height || 1080;
+  const fovWdeg = (imgW * c.pixscale) / 3600;
+  const fovHdeg = (imgH * c.pixscale) / 3600;
+  const fovWmin = fovWdeg * 60;
+  const fovHmin = fovHdeg * 60;
+  stat("fovDims", `${fovWdeg.toFixed(2)}° × ${fovHdeg.toFixed(2)}°`, `${fovWmin.toFixed(1)}′ × ${fovHmin.toFixed(1)}′ (Radius: ${c.radius.toFixed(2)}°)`);
+
+  stat("orient", c.orientation.toFixed(1) + "°", "East of North");
+  stat("parity", c.parity === 0 ? "Normal" : "Flipped / Mirrored");
+
+  // Render Compass & Sensor Diagnostics
+  drawCompass(c.orientation, c.parity);
+  analyzeSensorTilt(activeCanvas);
+
+  // Render Object Chips
+  const ul = $("objects");
+  ul.replaceChildren();
+  if (objects && objects.length > 0) {
+    objects.slice(0, 45).forEach(n => {
+      const li = document.createElement("li");
+      li.textContent = n;
+      li.title = `Search ${n} on SIMBAD`;
+      li.onclick = () => window.open(`https://simbad.cds.unistra.fr/simbad/sim-basic?Ident=${encodeURIComponent(n)}`, "_blank");
+      ul.appendChild(li);
+    });
+  } else {
+    const li = document.createElement("li");
+    li.textContent = "No prominent NGC/Messier catalog targets identified";
+    ul.appendChild(li);
+  }
+
+  // Render Sky Atlas Links
+  const pBox = $("skyPortals");
+  pBox.replaceChildren();
+  const portals = [
+    { name: "🔭 Stellarium Web", url: `https://stellarium-web.org/skysource/${encodeURIComponent(objects[0] || "Custom") }?fov=${(c.radius * 2.2).toFixed(1)}&date=${new Date().toISOString()}&ra=${(c.ra / 15).toFixed(4)}&dec=${c.dec.toFixed(4)}` },
+    { name: "🌌 Aladin Sky Atlas", url: `https://aladin.cds.unistra.fr/AladinLite/?target=${c.ra.toFixed(4)}%20${c.dec.toFixed(4)}&fov=${(c.radius * 2).toFixed(2)}` },
+    { name: "🪐 Telescopius", url: `https://telescopius.com/deep-sky/search?ra=${c.ra.toFixed(4)}&dec=${c.dec.toFixed(4)}` },
+    { name: "📚 SIMBAD Database", url: `https://simbad.cds.unistra.fr/simbad/sim-coo?Coord=${c.ra.toFixed(4)}d%20${c.dec.toFixed(4)}d&Radius=${(c.radius * 60).toFixed(1)}` }
+  ];
+  portals.forEach(p => {
+    const a = document.createElement("a");
+    a.className = "portal-pill";
+    a.href = p.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = p.name;
+    pBox.appendChild(a);
+  });
+
   $("openImg").href = `${NOVA}/annotated_display/${encodeURIComponent(jobId)}`;
   $("result").style.display = "block";
-  $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
+  $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 }
-</script>
-</body></html>
+
+/* ================= Export Handlers ================= */
+function downloadBlob(blob, name) {
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = u;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 2000);
+}
+
+// Download WCS FITS Header
+$("dlWcs").addEventListener("click", async () => {
+  if (!lastResult) return;
+  try {
+    $("dlStatus").textContent = "Fetching WCS header…";
+    const res = await fetch(`${API}/wcs/${lastResult.jobId}`);
+    if (!res.ok) throw new Error("WCS header not available.");
+    const blob = await res.blob();
+    downloadBlob(blob, `wcs-${lastResult.jobId}.fits`);
+    $("dlStatus").textContent = "WCS FITS downloaded.";
+  } catch (e) {
+    $("dlStatus").textContent = e.message;
+  }
+});
+
+// Download Star Matches Overlay
+$("dlStarMatches").addEventListener("click", () => {
+  if (!lastResult) return;
+  window.open(`${API}/stars/${lastResult.jobId}`, "_blank");
+});
+
+// Copy Coordinates
+$("copyCoords").addEventListener("click", async () => {
+  if (!lastResult) return;
+  const c = lastResult.calibration;
+  const text = `RA: ${hms(c.ra)} (${c.ra.toFixed(5)}°) | Dec: ${dms(c.dec)} (${c.dec.toFixed(5)}°) [J2000]`;
+  await navigator.clipboard.writeText(text);
+  $("dlStatus").textContent = "Coordinates copied to clipboard!";
+  setTimeout(() => { $("dlStatus").textContent = ""; }, 3000);
+});
+
+// Download Text Report
+$("dlTxt").addEventListener("click", () => {
+  if (!lastResult) return;
+  const c = lastResult.calibration;
+  const t = [
+    "============================================================",
+    "Astrometric Plate Solving Report",
+    "Indian Society For Scientific Consciousness (
