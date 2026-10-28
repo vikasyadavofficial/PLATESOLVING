@@ -87,6 +87,10 @@ a.btn{text-decoration:none;align-items:center}
 figure{margin:0}
 figure img{width:100%;height:auto;border-radius:10px;border:1px solid var(--border);box-shadow:0 10px 30px rgba(0,0,0,.2);background:var(--card)}
 figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{text-underline-offset:3px}
+.tips{margin-bottom:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+.tips summary{cursor:pointer;font-family:Manrope,sans-serif;font-weight:700;font-size:1.05rem}
+.tips ul{margin:.75rem 0 0;padding-left:1.2rem;color:var(--muted);font-size:.95rem}.tips li{margin:.35rem 0}.tips b{color:var(--fg)}
+.opt{display:flex;gap:.6rem;align-items:flex-start;margin-top:1rem;font-size:.9rem;color:var(--muted);cursor:pointer}.opt input{margin-top:.25rem;accent-color:var(--pri)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.bar i{width:100%}}
 </style></head>
 <body>
@@ -105,11 +109,21 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
   </section>
 
   <section class="wrap tool">
+    <details class="tips" open>
+      <summary>Tips for a photo that solves</summary>
+      <ul>
+        <li><b>Use night mode or a long exposure.</b> A few seconds makes the biggest difference, because the solver needs stars in the picture.</li>
+        <li><b>Keep the camera still.</b> Use a tripod, or rest your phone on something steady and use the timer.</li>
+        <li><b>Zoom out and avoid bright lights.</b> Use the widest lens, and keep street lamps and the bright Moon out of the frame.</li>
+        <li><b>Upload the original photo or FITS file.</b> Screenshots and photos forwarded through messaging apps lose detail.</li>
+      </ul>
+    </details>
     <label id="drop" tabindex="0" for="file" aria-label="Choose or drop a sky image">
       <img id="preview" alt="">
-      <div class="inner"><strong id="dropTitle">Drop an image here</strong><span id="dropHint">or click to browse. JPG, PNG, TIFF or WebP, up to 25 MB</span></div>
+      <div class="inner"><strong id="dropTitle">Drop an image here</strong><span id="dropHint">or click to browse. JPG, PNG, TIFF, WebP (up to 25 MB) or FITS (up to 50 MB)</span></div>
     </label>
-    <input id="file" type="file" accept="image/jpeg,image/png,image/tiff,image/webp">
+    <input id="file" type="file" accept="image/jpeg,image/png,image/tiff,image/webp,.fits,.fit,.fts,application/fits,image/fits">
+    <label class="opt"><input type="checkbox" id="clean" checked><span>Remove location data and shrink very large photos before uploading (recommended). For FITS files, location and observer name are blanked in the header. TIFF files are sent as they are.</span></label>
     <div class="row"><button class="btn" id="go" disabled>Solve image</button><span id="status" role="status" aria-live="polite"></span></div>
     <div class="bar" id="bar"><i></i></div>
   </section>
@@ -128,6 +142,7 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
     <div class="row">
       <a class="btn" id="openImg" target="_blank" rel="noopener noreferrer">Open image</a>
       <button class="btn" id="dlTxt" type="button">Download results</button>
+      <button class="btn" id="cpLink" type="button">Copy link</button>
       <span id="dlStatus" class="muted" role="status"></span>
     </div>
   </section>
@@ -140,7 +155,7 @@ figcaption{margin-top:.75rem;font-size:.85rem;color:var(--muted)}figcaption a{te
 "use strict";
 const API = "https://isscplatesolver.vikasyadav-official9680.workers.dev";   // <- your Worker URL (no trailing slash)
 const NOVA = "https://nova.astrometry.net";
-const MAX = 25 * 1024 * 1024, OK = ["image/jpeg","image/png","image/tiff","image/webp"];
+const FMAX = 50 * 1024 * 1024, MAX = 25 * 1024 * 1024, OK = ["image/jpeg","image/png","image/tiff","image/webp"];
 const $ = id => document.getElementById(id);
 let file = null, busy = false;
 const setStatus = (t, err) => { $("status").textContent = t; $("status").className = err ? "err" : ""; };
@@ -149,14 +164,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 // theme toggle (same behaviour as main site)
 $("tg").onclick = () => { const r = document.documentElement, dk = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme:dark)").matches; r.dataset.theme = dk ? "light" : "dark"; };
 
+const isFits = f => /\.(fits?|fts)$/i.test(f.name);
 function pick(f) {
   if (!f) return;
-  if (!OK.includes(f.type)) return setStatus("Use a JPG, PNG, TIFF or WebP image.", true);
-  if (f.size > MAX) return setStatus("That file is over 25 MB. Export a smaller copy.", true);
+  const fits = isFits(f);
+  if (!OK.includes(f.type) && !fits) return setStatus("Use a JPG, PNG, TIFF, WebP or FITS file.", true);
+  if (f.size > (fits ? FMAX : MAX)) return setStatus(`That file is over ${fits ? 50 : 25} MB. Export a smaller copy.`, true);
   file = f; setStatus("");
   $("dropTitle").textContent = f.name;
   $("dropHint").textContent = (f.size / 1048576).toFixed(1) + " MB. Click to choose another";
-  if (f.type !== "image/tiff") { const p = $("preview"); if (p.src) URL.revokeObjectURL(p.src); p.src = URL.createObjectURL(f); p.style.display = "block"; }
+  const p = $("preview"); if (p.src) URL.revokeObjectURL(p.src);
+  if (f.type !== "image/tiff" && !fits) { p.src = URL.createObjectURL(f); p.style.display = "block"; }
+  else { p.removeAttribute("src"); p.style.display = "none"; }
   $("go").disabled = false;
 }
 const drop = $("drop");
@@ -173,12 +192,45 @@ async function api(path, opts) {
   return j;
 }
 
+const MAXDIM = 3000;
+// Re-draw the photo on a canvas: this drops all metadata (including GPS) and shrinks very large images.
+const FITS_DROP = ["SITELAT","SITELONG","SITEELEV","LATITUDE","LONGITUD","LAT-OBS","LONG-OBS","ALT-OBS","GEOLAT","GEOLON","GEOELEV","OBSGEO-X","OBSGEO-Y","OBSGEO-Z","OBSERVER","AUTHOR"];
+// Blank location/observer cards in the primary FITS header (a blank card is valid FITS and keeps the file layout).
+async function cleanFits(f) {
+  try {
+    const buf = await f.arrayBuffer(), b = new Uint8Array(buf), dec = new TextDecoder("ascii");
+    for (let off = 0; off + 80 <= b.length && off < 2880 * 40; off += 80) {
+      const key = dec.decode(b.subarray(off, off + 8)).trim();
+      if (FITS_DROP.includes(key)) b.fill(32, off, off + 80);
+      if (key === "END") break;
+    }
+    return new Blob([buf], { type: "application/fits" });
+  } catch { return f; }
+}
+async function prepare(f) {
+  if (isFits(f)) return { blob: $("clean").checked ? await cleanFits(f) : f, scale: 1 };
+  if (!$("clean").checked || f.type === "image/tiff") return { blob: f, scale: 1 };
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.max(1, Math.max(bmp.width, bmp.height) / MAXDIM);
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width / k); c.height = Math.round(bmp.height / k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    if (bmp.close) bmp.close();
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.92));
+    if (!blob) throw 0;
+    return { blob, scale: k };
+  } catch { return { blob: f, scale: 1 }; }
+}
+
 $("go").addEventListener("click", async () => {
   if (!file || busy) return;
   busy = true; $("go").disabled = true; $("result").style.display = "none"; $("bar").style.display = "block";
   try {
+    setStatus($("clean").checked ? "Preparing photo…" : "Uploading…");
+    const prep = await prepare(file);
     setStatus("Uploading…");
-    const fd = new FormData(); fd.append("file", file);
+    const fd = new FormData(); fd.append("file", prep.blob, isFits(file) ? "upload.fits" : (prep.blob === file ? file.name : "photo.jpg"));
     const { subid } = await api("/solve", { method: "POST", body: fd });
     const started = Date.now(); let st;
     while (true) {
@@ -190,7 +242,8 @@ $("go").addEventListener("click", async () => {
       setStatus(st.state === "queued" ? "Waiting in the queue…" : "Matching stars…");
     }
     setStatus("Fetching results…");
-    show(await api("/result/" + st.jobId));
+    show(await api("/result/" + st.jobId), prep.scale);
+    history.replaceState(null, "", "#job=" + st.jobId + (prep.scale > 1.001 ? "&scale=" + prep.scale.toFixed(4) : ""));
     setStatus("");
   } catch (e) { setStatus(e.message, true); }
   finally { busy = false; $("go").disabled = false; $("bar").style.display = "none"; }
@@ -213,7 +266,7 @@ $("dlTxt").addEventListener("click", () => {
     "Plate Solver result · Indian Society For Scientific Consciousness", "",
     "Right ascension: " + hms(c.ra) + " (" + c.ra.toFixed(4) + " deg)",
     "Declination: " + dms(c.dec) + " (" + c.dec.toFixed(4) + " deg)",
-    "Pixel scale: " + c.pixscale.toFixed(2) + " arcsec/pixel",
+    "Pixel scale: " + (c.pixscale * (last.scale || 1)).toFixed(2) + " arcsec/pixel",
     "Field radius: " + c.radius.toFixed(2) + " deg",
     "Rotation: " + c.orientation.toFixed(1) + " deg east of north",
     "Parity: " + (c.parity === 0 ? "Normal" : "Flipped"), "",
@@ -221,11 +274,12 @@ $("dlTxt").addEventListener("click", () => {
   save(new Blob([t], { type: "text/plain" }), "plate-solved-" + last.jobId + ".txt");
 });
 
-function show({ calibration: c, objects, jobId }) {
-  last = { calibration: c, objects, jobId }; $("dlStatus").textContent = "";
+function show({ calibration: c, objects, jobId }, scale = 1) {
+  if (!c || typeof c.ra !== "number" || typeof c.pixscale !== "number") throw new Error("That result was not found.");
+  last = { calibration: c, objects: objects || [], jobId, scale }; $("dlStatus").textContent = ""; objects = last.objects;
   stat("ra", hms(c.ra), c.ra.toFixed(4) + "°");
   stat("dec", dms(c.dec), c.dec.toFixed(4) + "°");
-  stat("scale", c.pixscale.toFixed(2) + " ″/px");
+  stat("scale", (c.pixscale * scale).toFixed(2) + " ″/px", scale > 1.001 ? "of your original photo" : "");
   stat("radius", c.radius.toFixed(2) + "°", "about " + (c.radius * 2).toFixed(1) + "° across");
   stat("orient", c.orientation.toFixed(1) + "°", "east of north");
   stat("parity", c.parity === 0 ? "Normal" : "Flipped");
@@ -235,5 +289,18 @@ function show({ calibration: c, objects, jobId }) {
   $("result").style.display = "block";
   $("result").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth" });
 }
+$("cpLink").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(location.href); $("dlStatus").textContent = "Link copied."; }
+  catch { $("dlStatus").textContent = "Copy the address from your browser's address bar."; }
+});
+
+// Open a shared result link such as ...#job=12345
+(async () => {
+  const p = new URLSearchParams(location.hash.slice(1)), id = p.get("job");
+  if (!/^\d+$/.test(id || "")) return;
+  setStatus("Loading shared result…");
+  try { show(await api("/result/" + id), Math.max(1, parseFloat(p.get("scale")) || 1)); setStatus(""); }
+  catch (e) { setStatus(e.message || "Could not load that result.", true); }
+})();
 </script>
 </body></html>
